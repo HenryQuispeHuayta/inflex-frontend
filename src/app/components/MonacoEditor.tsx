@@ -1,64 +1,42 @@
-"use client";
-// components/MonacoEditor.tsx
-import React, { useState } from "react";
-import dynamic from "next/dynamic";
-import { MonacoEditorProps } from "../types/MonacoEditorProps";
+import { Editor } from "@monaco-editor/react";
+import { useState } from "react";
+import axios from "../utils/axios";
+import { configuration, languageDef } from "../utils/inflex";
 
-const MonacoEditor = dynamic(() => import("@monaco-editor/react"), {
-  ssr: false,
-});
+const editorWillMount = (monaco: any) => {
+  monaco.languages.register({ id: "inflex" });
+  monaco.languages.setMonarchTokensProvider("inflex", languageDef);
+  monaco.languages.setLanguageConfiguration("inflex", configuration);
+};
 
-const Editor: React.FC<MonacoEditorProps> = ({
-  value,
-  language,
-  theme,
-  onChange,
-}) => {
+export default function MonacoEditor() {
+  const [code, setCode] = useState<string>("");
   const [output, setOutput] = useState<string>("");
 
-  const executeCode = (code: string) => {
+  const handleExecute = async (code: string) => {
     try {
-      const log = console.log;
-      const logs: string[] = [];
-      console.log = (...args) => {
-        logs.push(args.join(" "));
-        log(...args);
-      };
-
-      eval(code);
-
-      console.log = log;
-
-      setOutput(logs.join("\n"));
-    } catch (e: any) {
-      setOutput(`Error ejecutando el código: ${e.message}`);
+      const { data } = await axios.post("/execute", { code: code });
+      setOutput(data.result);
+    } catch (error) {
+      setOutput("Error executing code");
     }
   };
 
+  const handleOnChange = (value: string = "") => {
+    setCode(value);
+  };
   return (
     <div>
-      <MonacoEditor
-        height="70vh"
-        defaultLanguage={language}
-        defaultValue={value}
-        theme={theme}
-        onChange={(value, event) => onChange(value, event)}
+      <Editor
+        height="90vh"
+        theme="vs-dark"
+        defaultLanguage="inflex"
+        value={code}
+        onChange={handleOnChange}
+        beforeMount={editorWillMount}
       />
-      <button onClick={() => executeCode(value)}>Run</button>
-      <div
-        style={{
-          marginTop: "20px",
-          padding: "10px",
-          border: "1px solid #ddd",
-          backgroundColor: "#f9f9f9",
-          color: "#333",
-        }}
-      >
-        <h3>Output:</h3>
-        <pre>{output}</pre>
-      </div>
+      <button onClick={() => handleExecute(code)}>Execute</button>
+      <div>{output}</div>
     </div>
   );
-};
-
-export default Editor;
+}
